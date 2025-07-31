@@ -1,0 +1,123 @@
+# ReactAgent pro dotazovaní přes Tsvily search s naslednou volbou uložení do souboru a snahou o pamět
+
+# Nerozchodil jsem ani jedno MCP Gmail a Outlook, strávil jsem nad tím celý den a nic (N8N mi to něhá super, kromě příloh)
+# Jako začátečník jsem ocenil Claude Code a budu zkoušet i LANGGRAPH VisualStudio, je fakt, že LANGGRAPH není tak "upovídaný" a určitě budu zkoušet se dostat více do kódu.
+
+
+
+
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langgraph.prebuilt import create_react_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain.memory import ConversationBufferMemory
+import os
+import asyncio
+from datetime import datetime
+
+load_dotenv()
+
+# Model
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+
+# Tavily Search Tool
+search = TavilySearchResults(max_results=3)
+
+# MCP se nepoužívá - používáme jen fallback tool
+
+# Fallback file tool pro případ, že MCP server není dostupný
+
+@tool
+def save_results_fallback(filename: str, content: str) -> str:
+    """
+    Fallback tool pro ukládání výsledků do souboru.
+    """
+    try:
+        # Vytvoř složku results pokud neexistuje
+        os.makedirs("results", exist_ok=True)
+        
+        # Ulož soubor
+        filepath = os.path.join("results", filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(content)
+        
+        return f"->>> Výsledky uloženy do souboru: {filepath}"
+    except Exception as e:
+        return f"->>> Chyba při ukládání: {str(e)}"
+
+# Initialize tools (bude aktualizováno při startu)
+tools = [search, save_results_fallback]
+
+
+async def main():
+    global tools, graph
+    
+    print("->>> Web Research Agent s MCP Filesystem a pamětí")
+    print("Umím vyhledávat na internetu a ukládat výsledky do souborů")
+    print("Pamatuji si celou konverzaci!")
+    print("Příklad: 'Najdi info o Bitcoin ceně a ulož to do souboru'")
+    print("Pro ukončení: quit, exit, q")
+    
+    
+    # Používáme pouze fallback file tool (MCP je složité)
+    print("->>> Používám lokální file tool pro ukládání")
+    
+    graph = create_react_agent(
+        model=llm,
+        tools=tools,
+        prompt="""Jsi Web Research Agent s MCP Filesystem integrací. Umíš:
+        1. Vyhledávat informace na internetu pomocí Tavily
+        2. Ukládat výsledky do souborů pomocí MCP Filesystem serveru
+
+            Odpovídej v češtině a buď vstřícný, technický a minimalistický.
+            Když něco vyhledáš, nabídni uložení výsledků do souboru.
+            Pro názvy souborů používej formát: vysledky_YYYYMMDD_HHMMSS.txt nebo podle požadavku uživatele."""
+    )
+    
+    print("-" * 50)
+    
+    # Inicializace LangChain ConversationBufferMemory
+    memory = ConversationBufferMemory(return_messages=True)
+    conversation_state = {"messages": []}
+    
+    while True:
+        user_input = input("\nUser: ")
+        if user_input.lower() in ["quit", "exit", "q"]:
+            print("->>> Nashledanou!")
+            break
+        
+        print("Agent>>> Zpracovávám...")
+        try:
+            # Uložení vstupní zprávy do LangChain memory
+            memory.chat_memory.add_user_message(user_input)
+            
+            # Přidej novou zprávu do LangGraph state
+            conversation_state["messages"].append(("user", user_input))
+            
+            # Spusť agenta s celou historií konverzace
+            for event in graph.stream(conversation_state):
+                for value in event.values():
+                    # Aktualizuj konverzační stav
+                    conversation_state = value
+                    # Zobraz pouze poslední zprávu asistenta
+                    last_message = value["messages"][-1]
+                    if hasattr(last_message, 'content'):
+                        response = last_message.content
+                        print("Assistant:", response)
+                        # Uložení odpovědi asistenta do LangChain memory
+                        memory.chat_memory.add_ai_message(response)
+                    else:
+                        response = str(last_message)
+                        print("Assistant:", response)
+                        memory.chat_memory.add_ai_message(response)
+        except Exception as e:
+            error_msg = f"Omlouvám se, došlo k chybě: {str(e)}"
+            print(f"Pozor> Chyba: {str(e)}")
+            # Přidej chybovou zprávu do obou pamětí
+            conversation_state["messages"].append(("assistant", error_msg))
+            memory.chat_memory.add_ai_message(error_msg)
+
+if __name__ == "__main__":
+    asyncio.run(main())
