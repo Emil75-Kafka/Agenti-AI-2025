@@ -1,5 +1,5 @@
 """
-Vlastní implementace RL algoritmů od nuly bez framworku
+Implementace RL algoritmů od nuly bez framworku s pomocí CCode.
 
 Reinforcement Learning
 
