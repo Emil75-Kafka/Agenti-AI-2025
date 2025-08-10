@@ -1,3 +1,4 @@
+"""
 Vlastní implementace RL algoritmů od nuly bez framworku
 
 Reinforcement Learning
@@ -10,7 +11,7 @@ Interaktivní interface: Volba parametrů přes terminál
 BFS analýza optimality: Porovnání s teoreticky nejkratšími cestami
 Detailní vizualizace: ASCII mapy s očíslovanými kroky
 Kompletní statistiky: Rozložení délek cest, četnost tras
-
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
