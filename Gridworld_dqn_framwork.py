@@ -1,5 +1,5 @@
 """
-GridWorld DQN - Framwork
+GridWorld DQN Framework s pomocí CCode
 
 Kombinuje jednoduchost původního rl_algorithms.py s "frameworkem" z gymnasium. Používá Stable-Baselines3 pro robustní DQN.
 """
